@@ -25,7 +25,7 @@ def fex(target_set : list,
     fs = set(full_set)
     qs_and_ts = qs.intersection(ts)
     qs_not_ts = qs.difference(ts)
-    ts_not_qs = ts.difference(qs)
+    ts_not_qs = fs.difference(qs).intersection(ts)
     not_ts_not_qs = fs.difference(qs).difference(ts)
     
     x = np.zeros((2,2))
@@ -68,7 +68,8 @@ def select_set(datum,
     lim = lim.reshape(-1,1)
     
     q = np.argmin(cumsum <= lim,axis = 1)
-    set_list = [names[sidx[x,0:q[x]]].tolist() for x in range(datum.shape[0])]
+    set_list = [names[sidx[x,0:q[x]]].tolist() for x \
+                in range(datum.shape[0])]
     
     if reshape:
         datum = datum.reshape(-1,)
