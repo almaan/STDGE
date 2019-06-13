@@ -20,14 +20,36 @@ import statsmodels.formula.api as smf
 from statsmodels.stats.multitest import multipletests as mpt
 
 import mygene 
+import logging
+
+# Logger -----------------------------------------------
+logger = logging.getLogger('najs')
+logger.setLevel(logging.DEBUG)
+c_handler = logging.StreamHandler()
+c_handler.setLevel(logging.DEBUG)
+c_format = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+c_handler.setFormatter(c_format)
+logger.addHandler(c_handler)
+
 
 # Functions ---------------------------------------------
+
+
+def pbar(num,n_tot):
+    delta = n_tot / 20.0
+    steps = int(np.floor(num / delta))
+    s1 = f'Estimating gene {num:7d}/{n_tot} ['
+    bar = '='*steps + ' '*(20 - steps)
+    s2 = ']'
+    
+    return ''.join([s1,bar,s2])
 
 def gene_dge(data,
              formula,
              hypothesis):
     
-        
+        """NB GLM with Wald test"""
+    
         family = sm.families.NegativeBinomial()
         mod1 = smf.glm(formula = formula,
                        data = data,
@@ -51,7 +73,7 @@ def distance_dependency(cnt,
                         formula = 'y ~ section + size + min_dist',
                         hypothesis = '(min_dist = 0)',
                         ):
-    
+    """DGE test based on distanct"""    
         
     if all([feature,value]):
         sel = meta.index[(meta[feature] ==  value)]
@@ -64,6 +86,7 @@ def distance_dependency(cnt,
     srt = np.argsort(np.sum(cnt.values,axis = 0))[::-1]
     srt = srt[0:n_genes]
     genelist = cnt.columns[srt].values.tolist()
+    n_genes = len(genelist)
     
     metacols = formula.split('~')[1].replace(' ','').split('+')
     varnames = ['y'] + metacols
@@ -81,7 +104,11 @@ def distance_dependency(cnt,
     results = pd.DataFrame(index = pd.Index(genelist),
                            columns = colnames)
     
-    for gene in genelist:
+    
+    for num,gene in enumerate(genelist):
+        print('\r',end='')
+        print(pbar(num,n_genes),end = '')
+        
         try:
             data = pd.concat([cnt.loc[sel][gene],data_base],axis = 1)
             data.columns = varnames
@@ -91,6 +118,7 @@ def distance_dependency(cnt,
         except ZeroDivisionError:
             results = results.drop(gene, axis = 0)
         
+    print('\n')
     adjpval = mpt(results['pval'].values,
                   alpha = 0.01,
                   method = 'fdr_bh')
@@ -103,6 +131,8 @@ def distance_dependency(cnt,
     return results
 
 def ensmbl2hgnc(ensmbl):
+    """Convert ENSEMBL to SYMBOLS"""
+    
     noambig = [x if 'ambig' not in x else None \
                for x in ensmbl ]
     
@@ -136,8 +166,8 @@ def main(cnt_list,
 
             dichotomous = all([x in section.meta['tumor'].values\
                            for x in ['tumor','non']])
-            
-                
+        
+            logger.info(f'section {cp} is not dicothomous')    
         
             if dichotomous and section.S > 1:
                 rep = section.meta['replicate'].values.astype(str)
@@ -147,10 +177,12 @@ def main(cnt_list,
                 
                 sf = np.log(section.cnt.values.sum(axis = 1))
                 section.update_meta(sf,'size')
-                
                 sections.append(section)
-    
+                logger.info(f'section {cp} is not dicothomous')
+                
+    logger.info('completed loading data')
     joint = joint_matrix(sections)
+    logger.info('created joint matrix')
     
     res = distance_dependency(joint['count_matrix'],
                               joint['meta_data'],
@@ -159,7 +191,11 @@ def main(cnt_list,
                               n_genes = n_genes,
                               )
     
+    logger.info('completed DGE analysis')
+    
     res['symbol'] = ensmbl2hgnc(res.index.tolist())    
+    logger.info('converting ENSEMBL ids to Symbols')
+    
     oname = os.path.join(outdir,'-'.join([timestamp,'DGE','dist.tsv']))
     res.to_csv(oname,
                sep = '\t',
@@ -167,6 +203,7 @@ def main(cnt_list,
                index = True,
                )
     
+    logger.info(f'saved results to {oname}')
 
 # Parser -----------------------------
 
@@ -191,7 +228,6 @@ if __name__ == '__main__':
     prs.add_argument('-o','--outdir',
                      required = False,
                      default = None,
-                     nargs = 1,
                      help = '',
                      )
     
@@ -240,10 +276,11 @@ if __name__ == '__main__':
     if not args.outdir:
         outdir = os.path.abspath(os.path.curdir)
     else:
-        outdir = outdir
+        outdir = args.outdir
     
     if not os.path.exists(outdir):
         os.mkdir(outdir)
+        logger.info(f'created {outdir}')
     
     input_args = dict(cnt_list = clist,
                       meta_list = mlist,
@@ -255,6 +292,6 @@ if __name__ == '__main__':
                       dlim = args.dlim,
                       )
     
-    print(input_args)
+    logger.info(f'input arguments : {input_args}')    
     
     main(**input_args)
