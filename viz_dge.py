@@ -52,7 +52,12 @@ def main(clist : list,
                            figsize = figsize,
                            )
     ax = ax.flatten()
-    
+    max_e = -np.inf
+    min_e = np.inf
+
+    section_list = list()
+    enrichment_list = list()
+
     
     for num in range(n_samples):
             print(f'Analyzing sample {num+1}/{n_samples}')
@@ -64,21 +69,34 @@ def main(clist : list,
                                   mass_proportion,
                                  )
             
-            section.plot_custom(enrichment,
+            section_list.append(section)
+            enrichment_list.append(enrichment)
+            
+            if np.max(enrichment) > max_e:
+                max_e = enrichment.max()
+            if np.min(enrichment) < min_e:
+                min_e = enrichment.min()
+            
+    for num in range(n_samples):
+            section_list[num].plot_custom(enrichment_list[num],
                                 mark_feature='tumor',
                                 mark_val='tumor',
                                 marker_size = 80,
-                                eax = ax[num])
+                                eax = ax[num],
+                                vmin = min_e,
+                                vmax = max_e,
+                                )
             
-            ax[num].set_title('_'.join([section.patient,
-                                        section.replicate]))
+            ax[num].set_title('_'.join([section_list[num].patient,
+                                        section_list[num].replicate]))
             ax[num].set_aspect('equal')
             ax[num].set_xticks([])
             ax[num].set_yticks([])
             
             for spine in ax[num].spines.values():
                 spine.set_visible(False)
-            
+        
+            section_list[num] = None
             
     for bnum in range(n_samples,n_cols*n_rows):
         fig.delaxes(ax[bnum])

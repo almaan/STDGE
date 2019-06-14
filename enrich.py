@@ -22,6 +22,7 @@ def fex(target_set : list,
     ts = set(target_set)
     qs = set(query_set)
     fs = set(full_set)
+    
     qs_and_ts = qs.intersection(ts)
     qs_not_ts = qs.difference(ts)
     ts_not_qs = fs.difference(qs).intersection(ts)
@@ -95,8 +96,11 @@ def enrichment_score(cnt : pd.DataFrame,
                                 mass_proportion = mass_proportion,
                                 )
     
+    full_set =  query_all.tolist() + target_set
+    print(f'full-set cardinality {len(set(full_set))}')
+    print(f'target-set cardinality {len(set(target_set))}')
+    
     for ii in range(len(query_top_list)):
-        full_set =  query_all.tolist() + target_set
         p = fex(target_set,query_top_list[ii], full_set)
         pvals.append(p)
     
