@@ -6,8 +6,7 @@ from scipy.special import loggamma
 
 
 def log_binom(n,k):
-    """Numerical stable binomial coeffient
-    """
+    """Numerical stable binomial coeffient"""
     n1 = loggamma(n+1)
     d1 = loggamma(k+1)
     d2 = loggamma(n-k + 1)
@@ -44,7 +43,7 @@ def fex(target_set : list,
 
 def select_set(datum,
                names,
-               thrs = 0.95):
+               mass_proportion = 0.95):
     
     """select top genes in set
     
@@ -64,7 +63,7 @@ def select_set(datum,
                        axis = 1)
     
     
-    lim = np.max(cumsum,axis = 1) * thrs
+    lim = np.max(cumsum,axis = 1) * mass_proportion
     lim = lim.reshape(-1,1)
     
     q = np.argmin(cumsum <= lim,axis = 1)
@@ -79,12 +78,21 @@ def select_set(datum,
 
 def enrichment_score(cnt : pd.DataFrame,
                      target_set : list,
+                     mass_proportion : float,
                      ):
+    
+    """Compute enrichment score
+    
+    computes the enrichment score for all
+    samples (rows) based on a target_set.
+    
+    """
     
     pvals = []
     query_all = cnt.columns.values
     query_top_list = select_set(cnt.values,
                                 query_all,
+                                mass_proportion = mass_proportion,
                                 )
     
     for ii in range(len(query_top_list)):
@@ -94,6 +102,8 @@ def enrichment_score(cnt : pd.DataFrame,
     
     pvals = np.array(pvals)
     
-    return pvals
+    return -np.log(pvals)
 
-    
+
+
+

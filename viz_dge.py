@@ -3,39 +3,191 @@
 
 import numpy as np
 import pandas as pd
-import sys
-import os
+import matplotlib.pyplot as plt
+import argparse as arp
 
+import os, sys
 sys.path.append(os.path.abspath('../'))
 
-from dataloading.dataloader import STsection, joint_matrix
-from utils import min_dist
 
-import umap
+from dataloading.dataloader import STsection
+from enrich import enrichment_score
+from utils import  comp_list
 
-#%%
-cntdir = '/home/alma/ST-2018/CNNp/DGE/data/count_data/her2nonlum'
-metadir = '/home/alma/ST-2018/CNNp/DGE/data/curated_feature_files/her2nonlum'
-cnt_list = [os.path.join(cntdir,x) for x in os.listdir(cntdir)]
-meta_list = [os.path.join(metadir,x) for x in os.listdir(metadir)]
-#%%
-gl = "/home/alma/ST-2018/BC_Stanford/scripts/dge/res/20190612223115355577-DGE-dist.tsv"
-gl = pd.read_csv(gl, sep = '\t', header = 0, index_col = 0)
-gl = gl.iloc[gl['beta'].values < 0,:]
-gl = gl.head(20).index.tolist()
-um = umap.UMAP(n_components=3) 
 
-for cp,mp in zip(cnt_list[0:1],meta_list[0:1]):
-        section = STsection(cp,mp)
+def main(clist : list,
+         mlist : list,
+         outname : list,
+         genes : pd.DataFrame,
+         mass_proportion,
+         alpha : float = 0.01,
+         n_cols : float = 3,
+         increasing = False,
+         ):
+
+    
+    genes = genes.iloc[genes['adjpval'].values < alpha,:]
+    print(f'using threshold {alpha} for adjusted pvalue')
+    if increasing:
+        genes = genes.iloc[genes['beta'].values > 0,:]
+        sign = 'positive'
+    else:
+        genes = genes.iloc[genes['beta'].values < 0,:]
+        sign = 'negative'
         
-#        cvals = um.fit_transform(section.cnt[gl].values)
-#        mx = cvals.max(axis=0).reshape(1,-1)
-#        mn = cvals.min(axis=0).reshape(1,-1)
-#        cvals = (cvals - mn) / (mx - mn)
-#        rgba = np.ones((cvals.shape[0],4))
-#        rgba[:,0:3] = cvals
-#        f,a = section.plot_custom(cvals)        
-#        section.plot_meta('tumor',var_type = 'cat')
-#        section.plot_gene(gl)
+    print(' '.join([f'using genes with',
+                        f'{sign} distance coef']))
+    
+    genes = genes.index.tolist()
+    
+    n_samples = len(clist)
+    n_cols = int(np.min((n_cols,n_samples)))
+    n_rows = int(np.ceil(n_samples / n_cols))
+    
+    figsize = (6 * n_cols, 6 * n_rows)
+    fig, ax = plt.subplots(n_rows,
+                           n_cols,
+                           sharex = True,
+                           sharey = True,
+                           figsize = figsize,
+                           )
+    ax = ax.flatten()
+    
+    
+    for num in range(n_samples):
+            print(f'Analyzing sample {num+1}/{n_samples}')
+            print(f'count file >> {clist[num]}')
+            print(f'meta file >> {mlist[num]}')
+            section = STsection(clist[num],mlist[num])
+            enrichment = enrichment_score(section.cnt,
+                                  genes,
+                                  mass_proportion,
+                                 )
+            
+            section.plot_custom(enrichment,
+                                mark_feature='tumor',
+                                mark_val='tumor',
+                                marker_size = 80,
+                                eax = ax[num])
+            
+            ax[num].set_title('_'.join([section.patient,
+                                        section.replicate]))
+            ax[num].set_aspect('equal')
+            ax[num].set_xticks([])
+            ax[num].set_yticks([])
+            
+            for spine in ax[num].spines.values():
+                spine.set_visible(False)
+            
+            
+    for bnum in range(n_samples,n_cols*n_rows):
+        fig.delaxes(ax[bnum])
+    
+    fig.savefig(outname)
+            
 
-#%%
+if __name__ == '__main__':
+    
+    prs = arp.ArgumentParser()
+    
+    prs.add_argument('-c','--count_matrix',
+                     required = True,
+                     nargs = '+',
+                     help = '',
+                     )
+    
+    prs.add_argument('-m','--meta_data',
+                     required = True,
+                     nargs = '+',
+                     help = '',
+                     )
+    
+    prs.add_argument('-g','--genelist',
+                     required = True,
+                     help = '',
+                     )
+    prs.add_argument('-i','--increasing',
+                     default = False,
+                     action = 'store_true',
+                     help = '',
+                     )
+    
+    prs.add_argument('-o','--outdir',
+                     type = str,
+                     help = '',
+                     )
+    
+    
+    prs.add_argument('-t','--tag',
+                     type = str,
+                     default = None,
+                     help = '',
+                     )
+    
+    prs.add_argument('-a','--alpha',
+                     type = float,
+                     default = 0.01,
+                     help = '',
+                     )
+    
+    prs.add_argument('-p','--mass_proportion',
+                     type = float,
+                     default = 0.95,
+                     help = '',
+                     )
+    
+    
+    
+    args = prs.parse_args()
+    
+    if not isinstance(args.count_matrix,list):
+        clist = [args.count_matrix]
+    else:
+        clist = args.count_matrix
+        
+    if not isinstance(args.meta_data,list):
+        mlist = [args.meta_data]
+    else:
+        mlist = args.meta_data
+    
+    if not args.outdir:
+        outdir = os.path.abspath(os.path.curdir)
+    else:
+        outdir = args.outdir
+    
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    
+    if args.tag:
+        idf = args.tag
+    else:
+        idf = str(int(np.random.random()*10000))
+    
+    outname = os.path.basename(args.genelist).replace('.tsv',f'.{idf}-plot.png')
+    outname = os.path.join(args.outdir,outname)
+    
+    clist.sort()
+    mlist.sort()
+    
+    
+    input_match = comp_list(clist,mlist)
+    
+    if input_match:
+        print('Input lists are likely equally sorted')
+    else:
+        print('Input lists are likely not equally sorted')
+
+    genes = pd.read_csv(args.genelist,
+                        sep = '\t',
+                        header = 0,
+                        index_col = 0)
+    
+    input_args = dict(clist = clist,
+                      mlist = mlist,
+                      genes = genes,
+                      outname = outname,
+                      mass_proportion = args.mass_proportion,
+                      alpha = args.alpha,
+                      )
+    
+    main(**input_args)

@@ -13,7 +13,7 @@ import argparse as arp
 sys.path.append(os.path.abspath('../'))
 
 from dataloading.dataloader import STsection, joint_matrix
-from utils import min_dist
+from utils import min_dist, comp_list
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -23,7 +23,7 @@ import mygene
 import logging
 
 # Logger -----------------------------------------------
-logger = logging.getLogger('najs')
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 c_handler = logging.StreamHandler()
 c_handler.setLevel(logging.DEBUG)
@@ -167,9 +167,9 @@ def main(cnt_list,
             dichotomous = all([x in section.meta['tumor'].values\
                            for x in ['tumor','non']])
         
-            logger.info(f'section {cp} is not dicothomous')    
-        
             if dichotomous and section.S > 1:
+                logger.info(f'loading count file >> {cp}')
+                logger.info(f'loading meta file >> {mp}')
                 rep = section.meta['replicate'].values.astype(str)
                 pat = section.meta['patient'].values.astype(str)
                 ui = np.array(['_'.join([p,r]) for p,r in zip(pat,rep)])
@@ -178,8 +178,12 @@ def main(cnt_list,
                 sf = np.log(section.cnt.values.sum(axis = 1))
                 section.update_meta(sf,'size')
                 sections.append(section)
+            else:
                 logger.info(f'section {cp} is not dicothomous')
-                
+        else:
+            logger.info(f'section {cp} is not dicothomous')    
+        
+        
     logger.info('completed loading data')
     joint = joint_matrix(sections)
     logger.info('created joint matrix')
@@ -262,7 +266,6 @@ if __name__ == '__main__':
     timestamp = str(datetime.datetime.today())
     timestamp = re.sub(':| |-|\.','',timestamp)
     
-    
     if not isinstance(args.count_matrix,list):
         clist = [args.count_matrix]
     else:
@@ -281,6 +284,15 @@ if __name__ == '__main__':
     if not os.path.exists(outdir):
         os.mkdir(outdir)
         logger.info(f'created {outdir}')
+    
+    clist.sort()
+    mlist.sort()
+    
+    input_match = comp_list(clist,mlist)
+    if input_match:
+        logger.info('Input lists are likely equally sorted')
+    else:
+        logger.error('Input lists are likely not equally sorted')
     
     input_args = dict(cnt_list = clist,
                       meta_list = mlist,
