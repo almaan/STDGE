@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 
-import sys
 import os
 import datetime
 import re
@@ -10,10 +9,10 @@ import pandas as pd
 import numpy as np
 import argparse as arp
 
-sys.path.append(os.path.abspath('../'))
+from QuickST.data import STsection
+from QuickST.data import utils
 
-from dataloading.dataloader import STsection, joint_matrix
-from utils import min_dist, comp_list
+from utils import min_dist
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -155,7 +154,7 @@ def main(cnt_list,
     eps = 10e-3
     sections = []
     for cp,mp in zip(cnt_list,meta_list):
-        section = STsection(cp,mp)
+        section = STsection.STsection(cp,mp)
         dichotomous = all([x in section.meta['tumor'].values\
                        for x in ['tumor','non']])
         
@@ -185,8 +184,13 @@ def main(cnt_list,
         
         
     logger.info('completed loading data')
-    joint = joint_matrix(sections)
-    logger.info('created joint matrix')
+    joint = dict(count_matrix = utils.join_samples([s.cnt for s \
+                                                    in sections])['joint_matrix'],
+                 meta_data = utils.join_samples([s.meta for s\
+                                                 in sections])['joint_matrix'],
+                 ) 
+    
+    logger.info('merged samples')
     
     res = distance_dependency(joint['count_matrix'],
                               joint['meta_data'],
@@ -288,7 +292,7 @@ if __name__ == '__main__':
     clist.sort()
     mlist.sort()
     
-    input_match = comp_list(clist,mlist)
+    input_match = utils.control_lists(clist,mlist)
     if input_match:
         logger.info('Input lists are likely equally sorted')
     else:

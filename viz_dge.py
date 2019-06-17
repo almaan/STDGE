@@ -6,11 +6,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse as arp
 
-import os, sys
-sys.path.append(os.path.abspath('../'))
+import os
 
+from QuickST.data import STsection
 
-from dataloading.dataloader import STsection
 from enrich import enrichment_score
 from utils import  comp_list
 
@@ -63,7 +62,7 @@ def main(clist : list,
             print(f'Analyzing sample {num+1}/{n_samples}')
             print(f'count file >> {clist[num]}')
             print(f'meta file >> {mlist[num]}')
-            section = STsection(clist[num],mlist[num])
+            section = STsection.STsection(clist[num],mlist[num])
             enrichment = enrichment_score(section.cnt,
                                   genes,
                                   mass_proportion,
