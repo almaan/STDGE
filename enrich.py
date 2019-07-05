@@ -42,10 +42,37 @@ def fex(target_set : list,
     
     return p
 
-def select_set(datum,
-               names,
-               mass_proportion = 0.95):
+
+def select_set_full(datum,
+                    names,
+                    target_set
+                    ):
+    """select smallest subset with full coverage
     
+    Selects the smallest ranked
+    subset of genes within a
+    spot which contains all of the genes of 
+    interest
+    
+    
+    """
+    
+    sidx = np.fliplr(np.argsort(datum,axis = 1)).astype(int)
+    set_list = list()
+    for spot in range(sidx.shape[0]):
+        snames = [names[x] for x in sidx[spot,:]]
+        fidx = [k for k,x in enumerate(snames) if x in target_set]
+        fidx = np.max(fidx)
+        set_list.append(snames[0:(fidx +1)])
+    
+    return set_list
+
+
+
+def select_set_cumsum(datum,
+                      names,
+                      mass_proportion = 0.95):
+            
     """select top genes in set
     
     Selects the top G genes which constitutes
@@ -76,11 +103,63 @@ def select_set(datum,
     
     return set_list
 
+def sampleValues(x,
+              n_samples,
+              n_genes):
 
-def enrichment_score(cnt : pd.DataFrame,
-                     target_set : list,
-                     mass_proportion : float,
-                     ):
+    if len(x.shape) < 2:
+        reshape = True
+        shape = x.shape
+        x = x.reshape(1,-1)
+    else:
+        reshape = False
+
+    vals = np.zeros((x.shape[0],n_samples))
+    for samp in range(n_samples):
+        genes = np.floor(np.random.random(n_genes) * x.shape[1]).astype(int)
+        vals[:,samp] = x[:,genes].sum(axis = 1)
+
+    if reshape:
+        x = x.reshape(shape)
+        vals = vals.reshape(-1,)
+
+    return vals
+
+
+def enrichment_score_sampling(cnt : pd.DataFrame,
+                             target_set : list,
+                             mass_proportion,
+                             ):
+    """
+    Bases enrichment score on comparision to 
+    multiple sampled set of genes. Attractive but
+    unfeasible
+    
+    """
+    
+    inter = cnt.columns.intersection(pd.Index(target_set))
+    n_targets = len(target_set)
+    nsamples = 100000
+    
+    # compute sum of target set for all spots
+    selscore = cnt.loc[:,inter].values.sum(axis=1).reshape(-1,1)
+    
+    svals = sampleValues(x = cnt.values,
+                         n_genes = n_targets,
+                         n_samples = nsamples,
+                         )
+    
+    
+    pvals = (selscore < svals).sum(axis=1) /nsamples
+    pvals[pvals == 0] = pvals[pvals != 0].min()
+    
+    return -np.log(pvals).reshape(-1,)
+    
+    
+def enrichment_score_fischer(cnt : pd.DataFrame,
+                         target_set : list,
+                         mass_proportion : float,
+                         ):
     
     """Compute enrichment score
     
@@ -91,10 +170,13 @@ def enrichment_score(cnt : pd.DataFrame,
     
     pvals = []
     query_all = cnt.columns.values
-    query_top_list = select_set(cnt.values,
-                                query_all,
-                                mass_proportion = mass_proportion,
-                                )
+    query_top_list = select_set_cumsum(cnt.values,
+                                       query_all,
+                                       mass_proportion = mass_proportion,
+                                       )
+    
+    n_in_set = len(set(target_set).intersection(set(query_all)))
+    print(f'{n_in_set} / {len(target_set)} of target genes present in data')
     
     full_set =  query_all.tolist() + target_set
     print(f'full-set cardinality {len(set(full_set))}')
@@ -107,7 +189,3 @@ def enrichment_score(cnt : pd.DataFrame,
     pvals = np.array(pvals)
     
     return -np.log(pvals)
-
-
-
-

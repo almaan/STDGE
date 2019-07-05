@@ -7,11 +7,13 @@ import matplotlib.pyplot as plt
 import argparse as arp
 
 import os
+import re
+import datetime
 
 from QuickST.data import STsection
+from QuickST.data import utils 
 
-from enrich import enrichment_score
-from utils import  comp_list
+from enrich import *
 
 
 def main(clist : list,
@@ -63,10 +65,10 @@ def main(clist : list,
             print(f'count file >> {clist[num]}')
             print(f'meta file >> {mlist[num]}')
             section = STsection.STsection(clist[num],mlist[num])
-            enrichment = enrichment_score(section.cnt,
-                                  genes,
-                                  mass_proportion,
-                                 )
+            enrichment = enrichment_score_fischer(section.cnt,
+                                                   genes,
+                                                   mass_proportion,
+                                                   )
             
             section_list.append(section)
             enrichment_list.append(enrichment)
@@ -80,7 +82,7 @@ def main(clist : list,
             section_list[num].plot_custom(enrichment_list[num],
                                 mark_feature='tumor',
                                 mark_val='tumor',
-                                marker_size = 80,
+                                marker_size = 70,
                                 eax = ax[num],
                                 vmin = min_e,
                                 vmax = max_e,
@@ -187,7 +189,7 @@ if __name__ == '__main__':
     mlist.sort()
     
     
-    input_match = comp_list(clist,mlist)
+    input_match = utils.control_lists(clist,mlist)
     
     if input_match:
         print('Input lists are likely equally sorted')

@@ -1,0 +1,31 @@
+# Structure of glm analysis
+
+
+Implement pytorch supprt, immediatly include GPU accessability
+
+
+Include spatial support :
+
+Construct KDtree (distance_threshold based) combined expression x_hat should represent the weighted mean of all nearby
+spots, but always sum to one, also dependent on distance.
+
+weights = exp(-x) / ( sum(exp(-x)))
+
+weights <-- compute once, store in |S| x |1| vectori
+
+nghbr <-- compute once store in |S| x |M| , where |M| is number of maximum neighbours for alls spots in S
+
+construct summation matrix
+    X - |S|x|G|
+    W = |S|x|S| <-- nasty size, but only constructd once
+    w_ij = exp(-d(x_i,x_j)) / sum_k exp(-d(x_i,x_k)
+    threshold w_ij to certain distance --> convert to sparse format
+    Y = W*X
+    Y_sg = sum_k w_sk x_kg
+    delete X,W from memory
+
+Compute_Gradient(X)
+Step Function(x)
+
+
+
